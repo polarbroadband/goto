@@ -24,6 +24,7 @@ func init() {
 /* ****************************************
 map manipulating
 **************************************** */
+
 // KeySlice returns a slice of map keys
 func KeySlice(m interface{}) []string {
 	xm, ok := m.(map[string]interface{})
@@ -31,7 +32,7 @@ func KeySlice(m interface{}) []string {
 		return nil
 	}
 	keys := make([]string, 0, len(xm))
-	for k, _ := range xm {
+	for k := range xm {
 		keys = append(keys, k)
 	}
 	return keys
@@ -87,17 +88,28 @@ func AssertMapString(x interface{}, k string) string {
 /* ****************************************
 map sorting functions
 **************************************** */
+
+// Compare encapsulates a string comparison function
 type Compare func(str1, str2 string) bool
 
+// NatureOrder creates a Compare instance operated on nature order of strings
+func NatureOrder() Compare {
+	retrieveNumber := func(str1, str2 string) bool {
+		return extractNumberFromString(str1, 0) < extractNumberFromString(str2, 0)
+	}
+	return Compare(retrieveNumber)
+}
+
+// Sort the string list based on Compare func
 func (cmp Compare) Sort(strs []string) {
-	strSort := &StrSorter{
+	strSort := &strSorter{
 		strs: strs,
 		cmp:  cmp,
 	}
 	sort.Sort(strSort)
 }
 
-type StrSorter struct {
+type strSorter struct {
 	strs []string
 	cmp  func(str1, str2 string) bool
 }
@@ -113,28 +125,23 @@ func extractNumberFromString(str string, size int) (num int) {
 
 	if size == 0 { // default
 		num, err := strconv.Atoi(strings.Join(strSlice, ""))
-
 		if err != nil {
-			//log.Fatal(err)
+			return 0
 		}
-
-		return num
-	} else {
-
-		num, err := strconv.Atoi(strSlice[size-1])
-		if err != nil {
-			//log.Fatal(err)
-		}
-
 		return num
 	}
+	num, err := strconv.Atoi(strSlice[size-1])
+	if err != nil {
+		return 0
+	}
+	return num
 }
 
-func (s *StrSorter) Len() int { return len(s.strs) }
+func (s *strSorter) Len() int { return len(s.strs) }
 
-func (s *StrSorter) Swap(i, j int) { s.strs[i], s.strs[j] = s.strs[j], s.strs[i] }
+func (s *strSorter) Swap(i, j int) { s.strs[i], s.strs[j] = s.strs[j], s.strs[i] }
 
-func (s *StrSorter) Less(i, j int) bool { return s.cmp(s.strs[i], s.strs[j]) }
+func (s *strSorter) Less(i, j int) bool { return s.cmp(s.strs[i], s.strs[j]) }
 
 // SortMapByField sorts a list of map by the value of a given key
 // either on the provided order or natural ascend
@@ -143,9 +150,6 @@ func SortMapByField(m []map[string]interface{}, f string, tseq []string) []map[s
 
 	withKey := []map[string]interface{}{}
 	withoutKey := []map[string]interface{}{}
-	compareStringNumber := func(str1, str2 string) bool {
-		return extractNumberFromString(str1, 0) < extractNumberFromString(str2, 0)
-	}
 
 	tseqm := make(map[string]struct{})
 	for _, em := range m {
@@ -172,12 +176,12 @@ func SortMapByField(m []map[string]interface{}, f string, tseq []string) []map[s
 	// sort by field f based on the natural ascend order
 	if tseq == nil {
 		tseq = []string{}
-		for em, _ := range tseqm {
+		for em := range tseqm {
 			tseq = append(tseq, em)
 		}
 		// sort the value list
 		//sort.Strings(tseq)
-		Compare(compareStringNumber).Sort(tseq)
+		NatureOrder().Sort(tseq)
 	}
 
 	// otherwise sort by field f based on the sequence of argument list
@@ -215,9 +219,6 @@ func SortMapByTwoFields(m []map[string]interface{}, f1 string, fseq []string, f2
 
 	withKey := []map[string]interface{}{}
 	withoutKey := []map[string]interface{}{}
-	compareStringNumber := func(str1, str2 string) bool {
-		return extractNumberFromString(str1, 0) < extractNumberFromString(str2, 0)
-	}
 
 	tseqm := make(map[string]struct{})
 	for _, em := range m {
@@ -244,12 +245,12 @@ func SortMapByTwoFields(m []map[string]interface{}, f1 string, fseq []string, f2
 	// sort by field f1 based on the natural ascend order
 	if fseq == nil {
 		fseq = []string{}
-		for em, _ := range tseqm {
+		for em := range tseqm {
 			fseq = append(fseq, em)
 		}
 		// sort the value list
 		//sort.Strings(fseq)
-		Compare(compareStringNumber).Sort(fseq)
+		NatureOrder().Sort(fseq)
 	}
 
 	// otherwise sort by field f1 based on the sequence of argument list
@@ -285,6 +286,7 @@ func SortMapByTwoFields(m []map[string]interface{}, f1 string, fseq []string, f2
 /* ****************************************
 string slice and map keys comparing functions
 **************************************** */
+
 // Sckm returns true if a string slice is equal to the keys of a map
 // regardless the order or repeat elements in the slice
 func Sckm(s []string, m interface{}) bool {
@@ -296,7 +298,7 @@ func Sckm(s []string, m interface{}) bool {
 	if len(su) != mv.Len() {
 		return false
 	}
-	for suk, _ := range su {
+	for suk := range su {
 		if !mv.MapIndex(reflect.ValueOf(suk)).IsValid() {
 			return false
 		}
@@ -304,7 +306,7 @@ func Sckm(s []string, m interface{}) bool {
 	return true
 }
 
-// Sscno returns true if two string slices are equal, regardless order and repeat
+// Sccno returns true if two string slices are equal, regardless order and repeat
 func Sccno(s1, s2 []string) bool {
 	su1 := make(map[string]int)
 	su2 := make(map[string]int)
@@ -317,7 +319,7 @@ func Sccno(s1, s2 []string) bool {
 	if len(su1) != len(su2) {
 		return false
 	}
-	for suk, _ := range su1 {
+	for suk := range su1 {
 		if _, ok := su2[suk]; !ok {
 			return false
 		}
@@ -378,6 +380,7 @@ func RandString(length int) string {
 /* ****************************************
 ip address functions
 **************************************** */
+
 // IP holds IPv4 and IPv6 data structure and provides operations on it
 type IP struct {
 	V6   bool // IPv4 - false, IPv6 - true
@@ -440,6 +443,7 @@ func (ip *IP) SameIP(t *IP) bool {
 /* ****************************************
 timestamp functions
 **************************************** */
+
 // StringToEpoch converts string to UTC epoch seconds
 func StringToEpoch(s string) (int64, error) {
 	formats := []string{
