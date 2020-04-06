@@ -325,6 +325,17 @@ func RevStringsOrder(s []string) (e []string) {
 	return
 }
 
+// IndexStrings returns index of element in given reference of string slice
+// return -1 if not found
+func IndexStrings(s *[]string, k string) int {
+	for p, v := range *s {
+		if v == k {
+			return p
+		}
+	}
+	return -1
+}
+
 // Sckm returns true if a string slice is equal to the keys of a map
 // regardless the order or repeat elements in the slice
 func Sckm(s []string, m interface{}) bool {
