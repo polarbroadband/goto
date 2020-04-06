@@ -317,6 +317,14 @@ func TrmEmptyString(s []string) (e []string) {
 	return
 }
 
+// RevStringsOrder revers the order of string slice
+func RevStringsOrder(s []string) (e []string) {
+	for i := len(s) - 1; i >= 0; i-- {
+		e = append(e, s[i])
+	}
+	return
+}
+
 // Sckm returns true if a string slice is equal to the keys of a map
 // regardless the order or repeat elements in the slice
 func Sckm(s []string, m interface{}) bool {
