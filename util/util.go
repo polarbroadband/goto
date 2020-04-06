@@ -286,6 +286,25 @@ func SortMapByTwoFields(m []map[string]interface{}, f1 string, fseq []string, f2
 /* ****************************************
 string slice and map keys comparing functions
 **************************************** */
+// InStrings returns true if string in the slice of strings
+func InStrings(e string, s []string) bool {
+	for _, se := range s {
+		if se == e {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveEmptyString remove the empty string from a slice
+func RemoveEmptyString(s []string) (e []string) {
+	for _, se := range s {
+		if se != "" {
+			e = append(e, se)
+		}
+	}
+	return
+}
 
 // Sckm returns true if a string slice is equal to the keys of a map
 // regardless the order or repeat elements in the slice
