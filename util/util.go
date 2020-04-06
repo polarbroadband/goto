@@ -306,6 +306,17 @@ func RemoveEmptyString(s []string) (e []string) {
 	return
 }
 
+// TrmEmptyString trim white spaces of all members before remove the empty elements from a slice
+func TrmEmptyString(s []string) (e []string) {
+	for _, se := range s {
+		se = strings.TrimSpace(se)
+		if se != "" {
+			e = append(e, se)
+		}
+	}
+	return
+}
+
 // Sckm returns true if a string slice is equal to the keys of a map
 // regardless the order or repeat elements in the slice
 func Sckm(s []string, m interface{}) bool {
