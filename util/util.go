@@ -286,9 +286,39 @@ func SortMapByTwoFields(m []map[string]interface{}, f1 string, fseq []string, f2
 /* ****************************************
 string slice and map keys comparing functions
 **************************************** */
+// ConvToStrings converts a interface{} to []string
+// underlying type []string or []interface{} only
+// logging and return empty []string for any invalid input
+func ConvToStrings(s interface{}) []string {
+	process := func(t []interface{}) (oprS []string) {
+		for _, e := range t {
+			if es, ok := e.(string); ok {
+				oprS = append(oprS, es)
+			} else {
+				log.Warn("ConvToStrings returns empty: at least one member of the given slice is not a string")
+				return []string{}
+			}
+		}
+		return
+	}
+	switch ts := s.(type) {
+	case []string:
+		return ts
+	case *[]string:
+		return *ts
+	case []interface{}:
+		return process(ts)
+	case *[]interface{}:
+		return process(*ts)
+	default:
+		log.Warn("ConvToStrings returns empty: neither []string nor []interface{}")
+		return []string{}
+	}
+}
+
 // InStrings returns true if string in the slice of strings
-func InStrings(e string, s []string) bool {
-	for _, se := range s {
+func InStrings(e string, s interface{}) bool {
+	for _, se := range ConvToStrings(s) {
 		if se == e {
 			return true
 		}
@@ -297,8 +327,8 @@ func InStrings(e string, s []string) bool {
 }
 
 // RemoveEmptyString remove the empty string from a slice
-func RemoveEmptyString(s []string) (e []string) {
-	for _, se := range s {
+func RemoveEmptyString(s interface{}) (e []string) {
+	for _, se := range ConvToStrings(s) {
 		if se != "" {
 			e = append(e, se)
 		}
@@ -307,8 +337,8 @@ func RemoveEmptyString(s []string) (e []string) {
 }
 
 // TrmEmptyString trim white spaces of all members before remove the empty elements from a slice
-func TrmEmptyString(s []string) (e []string) {
-	for _, se := range s {
+func TrmEmptyString(s interface{}) (e []string) {
+	for _, se := range ConvToStrings(s) {
 		se = strings.TrimSpace(se)
 		if se != "" {
 			e = append(e, se)
@@ -318,17 +348,19 @@ func TrmEmptyString(s []string) (e []string) {
 }
 
 // RevStringsOrder revers the order of string slice
-func RevStringsOrder(s []string) (e []string) {
-	for i := len(s) - 1; i >= 0; i-- {
-		e = append(e, s[i])
+func RevStringsOrder(s interface{}) (e []string) {
+	ss := ConvToStrings(s)
+	for i := len(ss) - 1; i >= 0; i-- {
+		e = append(e, ss[i])
 	}
 	return
 }
 
 // IndexStrings returns index of element in given reference of string slice
 // return -1 if not found
-func IndexStrings(s *[]string, k string) int {
-	for p, v := range *s {
+func IndexStrings(s interface{}, k string) int {
+	ss := ConvToStrings(s)
+	for p, v := range ss {
 		if v == k {
 			return p
 		}
