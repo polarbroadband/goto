@@ -347,6 +347,15 @@ func TrmEmptyString(s interface{}) (e []string) {
 	return
 }
 
+// TrmStrings trim white spaces of all members but keep the empty elements
+func TrmStrings(s interface{}) (e []string) {
+	for _, se := range ConvToStrings(s) {
+		se = strings.TrimSpace(se)
+		e = append(e, se)
+	}
+	return
+}
+
 // RevStringsOrder revers the order of string slice
 func RevStringsOrder(s interface{}) (e []string) {
 	ss := ConvToStrings(s)
