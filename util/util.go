@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -375,6 +376,73 @@ func IndexStrings(s interface{}, k string) int {
 		}
 	}
 	return -1
+}
+
+// Truncate a string to given length
+func Truncate(s string, maxLength int) string {
+	if len(s) > maxLength+1 {
+		s = s[0:maxLength] + "..."
+	}
+	return s
+}
+
+// StrInterpolate interpolate and extand a symbol string to a string list
+// the word to be calaulate mark as "^0-4$" to 0,1,2,3,4
+// the word to be calaulate mark as "^0-5+2$" to 0,2,4
+// the word to be calaulate mark as "^34, er_8, 9 8y$" to 34,er_8,9 8y
+/* "I had ^2 -3$ eggs for ^breakfast, dinner$" to be change to
+I had 2 eggs for breakfast
+I had 2 eggs for dinner
+I had 3 eggs for breakfast
+I had 3 eggs for dinner
+*/
+func StrInterpolate(s string) *[]string {
+	r := []string{s}
+	re := regexp.MustCompile(`(?:\^\s*(\d+)\s*-\s*(\d+)\s*(?:\+(\d+))?\$)|(?:\^[\w\s,]+\$)`)
+	fd := re.FindAllStringSubmatch(s, -1)
+	if len(fd) < 1 {
+		return nil
+	}
+	for _, elem := range fd {
+		ks := []string{}
+		if qt := regexp.MustCompile(`\^([\w\s,]+)\$`).FindStringSubmatch(elem[0]); len(qt) > 1 {
+			for _, qts := range strings.Split(qt[1], ",") {
+				ks = append(ks, strings.TrimSpace(qts))
+			}
+		} else {
+			start, err := strconv.ParseInt(elem[1], 10, 64)
+			if err != nil {
+				return nil
+			}
+			end, err := strconv.ParseInt(elem[2], 10, 64)
+			if err != nil {
+				return nil
+			}
+			ks = append(ks, elem[1])
+			var step int64 = 1
+			if elem[3] != "" {
+				step, err = strconv.ParseInt(elem[3], 10, 64)
+				if err != nil {
+					return nil
+				}
+			}
+			for {
+				start += step
+				if start > end {
+					break
+				}
+				ks = append(ks, strconv.FormatInt(start, 10))
+			}
+		}
+		tr := []string{}
+		for _, ri := range r {
+			for _, inpt := range ks {
+				tr = append(tr, strings.Replace(ri, elem[0], inpt, 1))
+			}
+		}
+		r = tr
+	}
+	return &r
 }
 
 // Sckm returns true if a string slice is equal to the keys of a map

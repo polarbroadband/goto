@@ -30,6 +30,9 @@ func (b *Block) MatchInBlock(p *regexp.Regexp) (m bool, r [][]string) {
 // Empty submatch still take space as "", and result won't be nil.
 func (b *Block) SoloMatchInBlock(p *regexp.Regexp) (m bool, r string) {
 	m, mv := b.MatchInBlock(p)
+	if !m {
+		return
+	}
 	return m, mv[0][0]
 }
 
@@ -39,6 +42,9 @@ func (b *Block) SoloMatchInBlock(p *regexp.Regexp) (m bool, r string) {
 // Empty submatch still take space as "", and result won't be nil.
 func (b *Block) SliceMatchInBlock(p *regexp.Regexp) (m bool, r []string) {
 	m, mv := b.MatchInBlock(p)
+	if !m {
+		return
+	}
 	for _, l := range mv {
 		r = append(r, l[0])
 	}
