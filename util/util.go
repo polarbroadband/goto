@@ -1,6 +1,8 @@
 package util
 
 import (
+	"bytes"
+	"html"
 	"math"
 	"math/rand"
 	"os"
@@ -12,6 +14,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/sergi/go-diff/diffmatchpatch"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -384,6 +387,89 @@ func Truncate(s string, maxLength int) string {
 		s = s[0:maxLength] + "..."
 	}
 	return s
+}
+
+// MakeHtmlTable convert [][]string to html table (dark scene)
+func MakeHtmlTable(src [][]string) string {
+	th := `<th style="border: 1px solid #dddddd; text-align: left; padding: 8px;">`
+	td := `<td style="border: 1px solid #dddddd; text-align: left; padding: 8px;">`
+	tre := `<tr style="background-color: #646464;">`
+	// header row
+	table := `<table style="border-collapse: collapse;"><tr>`
+	for _, columnHead := range src[0] {
+		table += th + columnHead + `</th>`
+	}
+	table += `</tr>`
+	bgF := true
+
+	for _, row := range src[1:] {
+		if bgF {
+			// even row, grey background
+			table += tre
+		} else {
+			table += `<tr>`
+		}
+		bgF = !bgF
+		for _, cell := range row {
+			table += td + cell + `</td>`
+		}
+		table += `</tr>`
+	}
+	return table + "</table>"
+}
+
+// DiffTxtInPretty is a modified DiffPrettyHtml function
+// apply html escape before convert
+// generate html code to be used within in <pre>
+// optimized for dark background
+func DiffTxtInPretty(dmp *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatch.Diff) string {
+	var buff bytes.Buffer
+	for _, diff := range diffs {
+		// text := strings.Replace(html.EscapeString(diff.Text), "\n", "&para;<br>", -1)
+		text := html.EscapeString(diff.Text)
+		switch diff.Type {
+		case diffmatchpatch.DiffInsert:
+			_, _ = buff.WriteString("<ins style=\"background:#00ff00; color:black;\">")
+			_, _ = buff.WriteString(text)
+			_, _ = buff.WriteString("</ins>")
+		case diffmatchpatch.DiffDelete:
+			_, _ = buff.WriteString("<del style=\"background:#ff3636; color:black;\">")
+			_, _ = buff.WriteString(text)
+			_, _ = buff.WriteString("</del>")
+		case diffmatchpatch.DiffEqual:
+			_, _ = buff.WriteString("<span>")
+			_, _ = buff.WriteString(text)
+			_, _ = buff.WriteString("</span>")
+		}
+	}
+	return buff.String()
+}
+
+// DiffHtmlInPretty is a modified DiffPrettyHtml function
+// no html escape, original []Diff was generated from html block
+// generate html code to be used within in <pre>
+// optimized for dark background
+func DiffHtmlInPretty(dmp *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatch.Diff) string {
+	var buff bytes.Buffer
+	for _, diff := range diffs {
+		// text := strings.Replace(html.EscapeString(diff.Text), "\n", "&para;<br>", -1)
+		text := diff.Text
+		switch diff.Type {
+		case diffmatchpatch.DiffInsert:
+			_, _ = buff.WriteString("<ins style=\"background:#00ff00; color:black;\">")
+			_, _ = buff.WriteString(text)
+			_, _ = buff.WriteString("</ins>")
+		case diffmatchpatch.DiffDelete:
+			_, _ = buff.WriteString("<del style=\"background:#ff3636; color:black;\">")
+			_, _ = buff.WriteString(text)
+			_, _ = buff.WriteString("</del>")
+		case diffmatchpatch.DiffEqual:
+			_, _ = buff.WriteString("<span>")
+			_, _ = buff.WriteString(text)
+			_, _ = buff.WriteString("</span>")
+		}
+	}
+	return buff.String()
 }
 
 // StrInterpolate interpolate and extand a symbol string to a string list
