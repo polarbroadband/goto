@@ -389,13 +389,13 @@ func Truncate(s string, maxLength int) string {
 	return s
 }
 
-// MakeHtmlTable convert [][]string to html table (dark scene)
+// MakeHtmlTable convert [][]string to html table (dark scene), auto scroll x
 func MakeHtmlTable(src [][]string) string {
 	th := `<th style="border: 1px solid #dddddd; text-align: left; padding: 8px;">`
 	td := `<td style="border: 1px solid #dddddd; text-align: left; padding: 8px;">`
 	tre := `<tr style="background-color: #646464;">`
 	// header row
-	table := `<table style="border-collapse: collapse;"><tr>`
+	table := `<div style="overflow-x: auto;"><table style="border-collapse: collapse;"><tr>`
 	for _, columnHead := range src[0] {
 		table += th + columnHead + `</th>`
 	}
@@ -415,7 +415,7 @@ func MakeHtmlTable(src [][]string) string {
 		}
 		table += `</tr>`
 	}
-	return table + "</table>"
+	return table + "</table></div>"
 }
 
 // DiffTxtInPretty is a modified DiffPrettyHtml function
