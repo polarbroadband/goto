@@ -199,3 +199,34 @@ func (b *Block) RmPeriod() {
 
 	*b = Block(nb)
 }
+
+// DiffFormat format the Block to a Diff optimized string
+func (b *Block) DiffFormat(p map[string]string) (s string) {
+	lastEmpty := false
+	for _, l := range *b {
+		// trim
+		nl := strings.TrimRight(l, " \n\t\r")
+		if strings.TrimSpace(nl) == "" {
+			if lastEmpty {
+				continue
+			}
+			nl = ""
+			lastEmpty = true
+		} else {
+			lastEmpty = false
+			// remove line
+			if p["rmTSLine"] != "" {
+				if regexp.MustCompile(p["rmTSLine"]).MatchString(nl) {
+					continue
+				}
+			}
+			// substitute string
+			if p["subDurStr"] != "" {
+				nl = regexp.MustCompile(p["subDurStr"]).ReplaceAllString(nl, "####")
+			}
+		}
+		// assembly string
+		s = s + nl + "\n"
+	}
+	return
+}
