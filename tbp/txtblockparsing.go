@@ -188,3 +188,14 @@ func (b *Block) Trim() {
 
 	*b = Block(nb)
 }
+
+// RmPeriod check each line of block and substitute time period string with "####"
+func (b *Block) RmPeriod() {
+	nb := []string{}
+	for _, l := range *b {
+		re := regexp.MustCompile(`\W(\d+[dh]\d\d[hm]\d\d[ms]|\d+[wd]\d+[dh]|\d\d:\d\d:\d\d)\W?`)
+		nb = append(nb, re.ReplaceAllString(l, "####"))
+	}
+
+	*b = Block(nb)
+}
