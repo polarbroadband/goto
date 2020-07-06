@@ -2,7 +2,9 @@ package util
 
 import (
 	"bytes"
+	"fmt"
 	"html"
+	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -761,4 +763,45 @@ func LogWithFields(log *log.Entry, f []string) *log.Entry {
 // RoundTo rounds a float to a given position, also a float type
 func RoundTo(x, unit float64) float64 {
 	return math.Round(x/unit) * unit
+}
+
+// GetEnvHashFrFile getting a k/v map of env var from a file in shell format
+func GetEnvHashFrFile(fileName string) map[string]string {
+	res := make(map[string]string)
+	if data, err := ioutil.ReadFile(fileName); err == nil {
+		re := regexp.MustCompile(`^([\w\.-]+)=([\w\.-]+)$`)
+		for _, ln := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+			m := re.FindStringSubmatch(strings.TrimSpace(ln))
+			if len(m) == 0 {
+				continue
+			}
+			if m[1] == "" {
+				continue
+			}
+			res[m[1]] = m[2]
+		}
+	}
+	return res
+}
+
+// GetEnvArrayFrFile getting an array of env var objects with "key" and "val" fields
+// original sequence will be preserved
+func GetEnvArrayFrFile(fileName string) []map[string]string {
+	res := []map[string]string{}
+	if data, err := ioutil.ReadFile(fileName); err == nil {
+		fmt.Println(string(data))
+		re := regexp.MustCompile(`^([\w\.-]+)=([\w\.-]+)$`)
+		for _, ln := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+			m := re.FindStringSubmatch(strings.TrimSpace(ln))
+			if len(m) == 0 {
+				continue
+			}
+			if m[1] == "" {
+				continue
+			}
+			fmt.Println(m)
+			res = append(res, map[string]string{"key": m[1], "val": m[2]})
+		}
+	}
+	return res
 }
