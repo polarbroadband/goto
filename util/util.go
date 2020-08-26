@@ -741,7 +741,7 @@ func StringToDuration(d string) time.Duration {
 	if len(y) > 1 {
 		if st, e := time.ParseDuration(y[1]); e == nil {
 			if med, e := strconv.ParseInt(y[0], 10, 64); e == nil {
-				dt := time.Duration(med * 1000000000)
+				dt := time.Duration(med * 24 * 3600 * 1000000000)
 				return dt + st
 			}
 		}
