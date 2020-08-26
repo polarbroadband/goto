@@ -733,6 +733,26 @@ func EpochToString(t int64) string {
 	return time.Unix(t, 0).Format(time.UnixDate)
 }
 
+// StringToDuration converts a duration string to time.Duration
+// add day unit support on top of time.ParseDuration
+// return 0 if invalid string
+func StringToDuration(d string) time.Duration {
+	y := strings.Split(d, "d")
+	if len(y) > 1 {
+		if st, e := time.ParseDuration(y[1]); e == nil {
+			if med, e := strconv.ParseInt(y[0], 10, 64); e == nil {
+				dt := time.Duration(med * 1000000000)
+				return dt + st
+			}
+		}
+		return time.Duration(0)
+	}
+	if st, e := time.ParseDuration(y[0]); e == nil {
+		return st
+	}
+	return time.Duration(0)
+}
+
 /* ****************************************
 utility functions
 **************************************** */
