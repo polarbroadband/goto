@@ -624,69 +624,6 @@ func RandString(length int) string {
 }
 
 /* ****************************************
-ip address functions
-**************************************** */
-
-// IP holds IPv4 and IPv6 data structure and provides operations on it
-type IP struct {
-	V6   bool // IPv4 - false, IPv6 - true
-	Addr string
-	Mask int
-}
-
-// StringToIP converts x.x.x.x/24 or f8ae:12::1/128 to IP obj, default mask is 32 or 128
-func StringToIP(s string) *IP {
-	var ip IP
-	var err error
-	if strings.Contains(s, ":") {
-		ip.V6 = true
-	} else if !strings.Contains(s, ".") {
-		return nil
-	}
-	sst := strings.Split(s, "/")
-	switch len(sst) {
-	case 1:
-		ip.Addr = sst[0]
-		if ip.V6 {
-			ip.Mask = 128
-		} else {
-			ip.Mask = 32
-		}
-	case 2:
-		ip.Addr = sst[0]
-		ip.Mask, err = strconv.Atoi(sst[1])
-		if err != nil {
-			return nil
-		}
-		// more strict check add here
-	default:
-		return nil
-	}
-	return &ip
-}
-
-// ListToIps converts a slice of IP address string to a IP obj slice
-func ListToIps(l []string) (i []*IP) {
-	for _, ip := range l {
-		i = append(i, StringToIP(ip))
-	}
-	return
-}
-
-// String converts IP to a string like x.x.x.x/32
-func (ip *IP) String() string {
-	return ip.Addr + "/" + strconv.Itoa(ip.Mask)
-}
-
-// SameIP returns true if two IP have the same address and mask
-func (ip *IP) SameIP(t *IP) bool {
-	if ip.Addr == t.Addr && ip.Mask == t.Mask {
-		return true
-	}
-	return false
-}
-
-/* ****************************************
 timestamp functions
 **************************************** */
 
@@ -751,6 +688,24 @@ func StringToDuration(d string) time.Duration {
 		return st
 	}
 	return time.Duration(0)
+}
+
+// HMSToDuration converts 6:10:30 format string to time.Duration
+func HMSToDuration(s string) time.Duration {
+	temp := []string{"s", "m", "h"}
+	ss := strings.Split(s, ":")
+	if len(ss) > 3 || len(ss) < 1 {
+		return time.Duration(0)
+	}
+	k := 0
+	for i := len(ss) - 1; i >= 0; i-- {
+		ss[i] = strings.TrimSpace(ss[i]) + temp[k]
+		k += 1
+	}
+	p := strings.Join(ss, "")
+	fmt.Println(p)
+	r, _ := time.ParseDuration(p)
+	return r
 }
 
 /* ****************************************
@@ -824,4 +779,39 @@ func GetEnvArrayFrFile(fileName string) []map[string]string {
 		}
 	}
 	return res
+}
+
+/* ****************************************
+Error manipulating
+**************************************** */
+
+type ExeErr struct {
+	FuncName string
+	Instance string
+}
+
+func NewExeErr(f string, i ...string) *ExeErr {
+	r := ExeErr{FuncName: f, Instance: ""}
+	if len(i) > 0 {
+		r.Instance = strings.Join(i, ", ")
+	}
+	return &r
+}
+func (e *ExeErr) String(s string, err interface{}) string {
+	r := "failed " + e.FuncName
+	if e.Instance != "" {
+		r += " on " + e.Instance + ","
+	} else {
+		r += ","
+	}
+	return r + fmt.Sprintf(" %s: %v", s, err)
+}
+func (e *ExeErr) Error(s string, err interface{}) error {
+	r := "failed " + e.FuncName
+	if e.Instance != "" {
+		r += " on " + e.Instance + ","
+	} else {
+		r += ","
+	}
+	return fmt.Errorf(r+" %s: %v", s, err)
 }
