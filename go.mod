@@ -3,6 +3,7 @@ module github.com/polarbroadband/goto
 go 1.14
 
 require (
+	github.com/fatih/structs v1.1.0
 	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect
 	github.com/sergi/go-diff v1.1.0
 	github.com/sirupsen/logrus v1.6.0

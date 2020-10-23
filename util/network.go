@@ -3,7 +3,6 @@ package util
 import (
 	"strconv"
 	"strings"
-	"time"
 )
 
 /* ****************************************
@@ -72,24 +71,3 @@ func (ip *IP) SameIP(t *IP) bool {
 /* ****************************************
 Protocol structure
 **************************************** */
-
-// BGPRecvdRoutes holds BGP prefixes advertised to peer
-type BGPRecvdRoutes struct {
-	Peer     string // neighbor ip
-	Local    string // local ip
-	Type     string // Internal/External
-	Prefixes map[string]BGPAttributes
-}
-
-// BGPAttributes holds properties of a BGP prefix
-type BGPAttributes struct {
-	Prefix    string
-	Nexthop   string
-	LocalPref int64
-	MED       int64
-	ASPath    []string
-	Community []string
-	Flags     map[string]bool
-	Tag       string
-	Age       time.Duration
-}
