@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html"
+	"reflect"
 
 	"github.com/fatih/structs"
 	"github.com/sergi/go-diff/diffmatchpatch"
@@ -52,7 +53,7 @@ func (d *TableBuilder) Build() string {
 		}
 		f := true
 		for kh, vh := range d.RowHLs {
-			if vm[kh] == vh {
+			if reflect.DeepEqual(vm[kh], vh) {
 				f = f && true
 			} else {
 				f = f && false

@@ -159,6 +159,45 @@ func (b *Block) FetchBlock(s *regexp.Regexp, e *regexp.Regexp) (blocks []*Block,
 	return
 }
 
+// Segment separate the txt block to lst of sub blocks based on the end line pattern
+// only blocks have the start line pattern will be returned
+// titlecatch in sync with return block list
+// no match will return an empty list
+func (b *Block) Segment(s *regexp.Regexp, e *regexp.Regexp) (blocks []*Block, titleCatch [][]string) {
+	pblocks := []Block{}
+	// use end line pattern to segment the block
+	pblock := Block{}
+	for _, line := range *b {
+		pblock = append(pblock, line)
+		if e.MatchString(line) {
+			pblocks = append(pblocks, pblock)
+			pblock = Block{}
+			continue
+		}
+	}
+	// may have a empty segment attached to the end of segment list
+	pblocks = append(pblocks, pblock)
+	// only save the segment contains the start line,
+	for _, seg := range pblocks {
+		m, title := seg.MatchInBlock(s)
+		if m {
+			blocks = append(blocks, seg.Copy())
+			titleCatch = append(titleCatch, title[0])
+		}
+	}
+	return
+}
+
+// Copy returns a reference of the block deep copy
+func (b *Block) Copy() *Block {
+	// deep copy
+	res := Block{}
+	for _, l := range *b {
+		res = append(res, l)
+	}
+	return &res
+}
+
 // String converts Block content back to single string
 func (b *Block) String() (s string) {
 	for _, l := range *b {
