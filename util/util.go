@@ -584,24 +584,38 @@ func EpochToString(t int64) string {
 	return time.Unix(t, 0).Format(time.UnixDate)
 }
 
-// StringToDuration converts a duration string to time.Duration
-// add day unit support on top of time.ParseDuration
+// StringToDuration converts a duration string (8y10w7d6h5m20s)to time.Duration
+// add year, week and day unit support on top of time.ParseDuration
 // return 0 if invalid string
-func StringToDuration(d string) time.Duration {
-	y := strings.Split(d, "d")
-	if len(y) > 1 {
-		if st, e := time.ParseDuration(y[1]); e == nil {
-			if med, e := strconv.ParseInt(y[0], 10, 64); e == nil {
-				dt := time.Duration(med * 24 * 3600 * 1000000000)
-				return dt + st
-			}
-		}
+func StringToDuration(s string) time.Duration {
+	ss := regexp.MustCompile(`^(?:(\d+)y)?(?:(\d+)w)?(?:(\d+)d)?([\dhms]+)?$`).FindStringSubmatch(strings.ToLower(s))
+	if len(ss) == 0 {
 		return time.Duration(0)
 	}
-	if st, e := time.ParseDuration(y[0]); e == nil {
-		return st
+	dur := time.Duration(0)
+	if ss[1] != "" { // year
+		if num, e := strconv.ParseInt(ss[1], 10, 64); e != nil {
+			return time.Duration(0)
+		} else {
+			dur += time.Duration(num * 365 * 24 * 3600 * 1000000000)
+		}
 	}
-	return time.Duration(0)
+	if ss[2] != "" { // week
+		if num, e := strconv.ParseInt(ss[2], 10, 64); e != nil {
+			return time.Duration(0)
+		} else {
+			dur += time.Duration(num * 7 * 24 * 3600 * 1000000000)
+		}
+	}
+	if ss[3] != "" { // day
+		if num, e := strconv.ParseInt(ss[3], 10, 64); e != nil {
+			return time.Duration(0)
+		} else {
+			dur += time.Duration(num * 24 * 3600 * 1000000000)
+		}
+	}
+	st, _ := time.ParseDuration(ss[4]) // h:m:s
+	return dur + st
 }
 
 // HMSToDuration converts 6:10:30 format string to time.Duration

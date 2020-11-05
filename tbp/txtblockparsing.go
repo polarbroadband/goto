@@ -159,6 +159,32 @@ func (b *Block) FetchBlock(s *regexp.Regexp, e *regexp.Regexp) (blocks []*Block,
 	return
 }
 
+// cut separate the txt block to lst of sub blocks based on the start line pattern
+// titlecatch in sync with return block list
+// no match will return an empty list
+func (b *Block) Cut(s *regexp.Regexp) (blocks []*Block, titleCatch [][]string) {
+	pblocks := []Block{}
+	// use start line pattern to segment the block
+	pblock := Block{}
+	for _, line := range *b {
+		if s.MatchString(line) {
+			pblocks = append(pblocks, pblock)
+			pblock = Block{}
+		}
+		pblock = append(pblock, line)
+	}
+	pblocks = append(pblocks, pblock)
+	// only save the segment contains the start line,
+	for _, seg := range pblocks {
+		m, title := seg.MatchInBlock(s)
+		if m {
+			blocks = append(blocks, seg.Copy())
+			titleCatch = append(titleCatch, title[0])
+		}
+	}
+	return
+}
+
 // Segment separate the txt block to lst of sub blocks based on the end line pattern
 // only blocks have the start line pattern will be returned
 // titlecatch in sync with return block list
