@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html"
 	"reflect"
@@ -214,4 +215,13 @@ func DiffHtmlInPretty(dmp *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatch
 		}
 	}
 	return buff.String()
+}
+
+// GetStructDiff pretty jsonfy two structs and return the html diff result
+func GetStructDiff(s1, s2 interface{}) string {
+	ss1, _ := json.MarshalIndent(s1, "", "    ")
+	ss2, _ := json.MarshalIndent(s2, "", "    ")
+	diff := diffmatchpatch.New()
+	sdf := diff.DiffCleanupSemanticLossless(diff.DiffMain(string(ss1), string(ss2), true))
+	return `<div>` + DiffHtmlInPretty(diff, sdf) + `</div>`
 }
