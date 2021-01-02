@@ -710,36 +710,28 @@ func GetEnvArrayFrFile(fileName string) []map[string]string {
 }
 
 /* ****************************************
-Error manipulating
+Error handling
 **************************************** */
 
-type ExeErr struct {
-	FuncName string
-	Instance string
-}
+// function execution failure
+type ExeErr string
 
-func NewExeErr(f string, i ...string) *ExeErr {
-	r := ExeErr{FuncName: f, Instance: ""}
+func NewExeErr(f string, i ...string) ExeErr {
+	r := fmt.Sprintf("func %s failed", f)
 	if len(i) > 0 {
-		r.Instance = strings.Join(i, ", ")
+		r = strings.Join(i, "_") + " " + r
 	}
-	return &r
+	return ExeErr(r)
 }
-func (e *ExeErr) String(s string, err interface{}) string {
-	r := "failed " + e.FuncName
-	if e.Instance != "" {
-		r += " on " + e.Instance + ","
-	} else {
-		r += ","
+func (e ExeErr) String(s string, err interface{}) string {
+	if err == nil || err == "" {
+		return fmt.Sprintf("%v, %s", e, s)
 	}
-	return r + fmt.Sprintf(" %s: %v", s, err)
+	return fmt.Sprintf("%v, %s: %v", e, s, err)
 }
-func (e *ExeErr) Error(s string, err interface{}) error {
-	r := "failed " + e.FuncName
-	if e.Instance != "" {
-		r += " on " + e.Instance + ","
-	} else {
-		r += ","
+func (e ExeErr) Error(s string, err interface{}) error {
+	if err == nil || err == "" {
+		return fmt.Errorf("%v, %s", e, s)
 	}
-	return fmt.Errorf(r+" %s: %v", s, err)
+	return fmt.Errorf("%v, %s: %v", e, s, err)
 }
