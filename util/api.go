@@ -22,6 +22,10 @@ import (
 type API struct {
 	// JWT token secret
 	TokenSec []byte
+	// AuthToken type JWT token string
+	Token AuthToken
+	// authenticated JWT claims map
+	Claims jwt.MapClaims
 	// gRPC api list not requir auth check
 	NoAuth []string
 	Log    *log.Entry
@@ -46,7 +50,7 @@ func (api *API) Error(w http.ResponseWriter, code int, err ...string) {
 }
 
 // Auth http handler function
-// perform JWT authentication and pass token to the next handler
+// perform JWT authentication and pass token to the next handler by context
 func (api *API) Auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authHeader := strings.Split(r.Header.Get("Authorization"), "Bearer ")
@@ -66,8 +70,9 @@ func (api *API) Auth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			ctx := context.WithValue(r.Context(), AuthToken("token"), claims)
-			next(w, r.WithContext(ctx))
+			api.Token = AuthToken(r.Header.Get("Authorization"))
+			api.Claims = claims
+			next(w, r)
 		} else {
 			api.Error(w, http.StatusUnauthorized, fmt.Sprintf("Unauthorized Access Atempt, uid: %v", claims["uid"]))
 		}
@@ -76,7 +81,7 @@ func (api *API) Auth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // AuthGrpcUnary gRPC handler function, called by gRPC interceptor for api JWT authentication
-// perform Unary function JWT authentication and pass token to the next handler
+// perform Unary function JWT authentication and pass token to the next handler by context
 func (api *API) AuthGrpcUnary(ctx context.Context, req interface{}, srv *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	// skip calls no auth requirement
 	for _, a := range api.NoAuth {
@@ -110,8 +115,8 @@ func (api *API) AuthGrpcUnary(ctx context.Context, req interface{}, srv *grpc.Un
 		return nil, status.Errorf(codes.Unauthenticated, "")
 	}
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		// pass token to handler
-		ctx := context.WithValue(ctx, AuthToken("token"), claims)
+		api.Token = AuthToken(ts[0])
+		api.Claims = claims
 		return handler(ctx, req)
 	}
 	api.Log.WithError(err).Warn("invalid token")

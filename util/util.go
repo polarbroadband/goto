@@ -719,7 +719,7 @@ type ExeErr string
 func NewExeErr(f string, i ...string) ExeErr {
 	r := fmt.Sprintf("func %s failed", f)
 	if len(i) > 0 {
-		r = strings.Join(i, "_") + " " + r
+		r = strings.Join(i, "/") + " " + r
 	}
 	return ExeErr(r)
 }
