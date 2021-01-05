@@ -11,7 +11,10 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
 
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -206,4 +209,68 @@ type MongoOpr struct {
 func (dba *MongoOpr) Set(col string) {
 	dba.Mctx, dba.Mcancel = context.WithTimeout(context.Background(), 10*time.Second)
 	dba.Mcoll = dba.Mdb.Collection(col)
+}
+
+// GetID find the exact data based on the given mongo _id and projection
+// return false if no found
+func (dba *MongoOpr) GetID(res interface{}, id primitive.ObjectID, projection map[string]interface{}) (bool, error) {
+	f := bson.D{{"_id", id}}
+	p, err := bson.Marshal(projection)
+	if err != nil {
+		return false, err
+	}
+	if err := dba.Mcoll.FindOne(dba.Mctx, f, options.FindOne().SetProjection(p)).Decode(res); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+// GetData find the first data based on the given filter and projection
+// return false if no found
+func (dba *MongoOpr) GetData(res interface{}, filter, projection map[string]interface{}) (bool, error) {
+	f, err := bson.Marshal(filter)
+	if err != nil {
+		return false, err
+	}
+	p, err := bson.Marshal(projection)
+	if err != nil {
+		return false, err
+	}
+	if err := dba.Mcoll.FindOne(dba.Mctx, f, options.FindOne().SetProjection(p)).Decode(res); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+// GetDataset returns ordered data set based on given filter and projection
+func (dba *MongoOpr) GetDataset(res interface{}, filter, projection, order map[string]interface{}) error {
+	f, err := bson.Marshal(filter)
+	if err != nil {
+		return err
+	}
+	p, err := bson.Marshal(projection)
+	if err != nil {
+		return err
+	}
+	o, err := bson.Marshal(order)
+	if err != nil {
+		return err
+	}
+	// find all but only return projected fields
+	cursor, err := dba.Mcoll.Find(dba.Mctx, f, options.Find().SetSort(o).SetProjection(p))
+	if err != nil {
+		return err
+	}
+	if err := cursor.All(dba.Mctx, res); err != nil {
+		return err
+	}
+	return nil
 }
