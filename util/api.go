@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
+
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -79,6 +82,33 @@ func (api *API) Auth(next http.HandlerFunc) http.HandlerFunc {
 		return
 	}
 }
+
+/*
+func auth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := strings.Split(r.Header.Get("Authorization"), "Bearer ")
+		if len(authHeader) != 2 {
+			log.Warn("Malformed token")
+			w.WriteHeader(http.StatusUnauthorized)
+		} else {
+			jwtToken := authHeader[1]
+			token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				}
+				return TOKENSEC, nil
+			})
+
+			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+				ctx := context.WithValue(r.Context(), "token", claims)
+				next.ServeHTTP(w, r.WithContext(ctx))
+			} else {
+				log.WithError(err).Warnf("Unauthorized Access Atempt, uid: %v", claims["uid"])
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		}
+	})
+}*/
 
 // AuthGrpcUnary gRPC handler function, called by gRPC interceptor for api JWT authentication
 // perform Unary function JWT authentication and pass token to the next handler by context
@@ -163,4 +193,17 @@ func (t AuthToken) GetRequestMetadata(ctx context.Context, in ...string) (map[st
 // to mandate use of TLS transport layer
 func (t AuthToken) RequireTransportSecurity() bool {
 	return true
+}
+
+// MongoOpr define methods for mongo database operation
+type MongoOpr struct {
+	Mdb     *mongo.Database
+	Mcoll   *mongo.Collection
+	Mctx    context.Context
+	Mcancel context.CancelFunc
+}
+
+func (dba *MongoOpr) Set(col string) {
+	dba.Mctx, dba.Mcancel = context.WithTimeout(context.Background(), 10*time.Second)
+	dba.Mcoll = dba.Mdb.Collection(col)
 }
