@@ -37,8 +37,10 @@ type API struct {
 	Log    *log.Entry
 }
 
-// Error REST api error handling function
-// log and response http error code with in-body "error" message
+// Error is REST api error handling function
+// log 1st error message if exist
+// report joint 2nd up to the end error messages if exist, otherwise report the same 1st message
+// response http error code with json body using key "error"
 func (api *API) Error(w http.ResponseWriter, code int, err ...string) {
 	if len(err) == 0 {
 		err = append(err, "server error")
@@ -53,6 +55,24 @@ func (api *API) Error(w http.ResponseWriter, code int, err ...string) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(res)
+}
+
+// Errpc is gRPC api error handling function
+// log 1st error message if exist
+// report joint 2nd up to the end error messages if exist, otherwise report the same 1st message
+// generate gRPC status message
+func (api *API) Errpc(code codes.Code, err ...string) error {
+	if len(err) == 0 {
+		err = append(err, "server error")
+	}
+	api.Log.Error(err[0])
+	var res string
+	if len(err) == 1 {
+		res = err[0]
+	} else {
+		res = strings.Join(err[1:], ", ")
+	}
+	return status.Errorf(code, res)
 }
 
 // Auth http handler function
