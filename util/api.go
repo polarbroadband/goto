@@ -92,7 +92,7 @@ func (api *API) Auth(next http.HandlerFunc) http.HandlerFunc {
 			return api.TokenSec, nil
 		})
 		if err != nil {
-			api.Error(w, http.StatusUnauthorized, fmt.Sprint(err), "Unauthorized")
+			api.Error(w, http.StatusUnauthorized, fmt.Sprintf("JWT auth fail: %v", err), "Unauthorized")
 			return
 		}
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
@@ -100,7 +100,7 @@ func (api *API) Auth(next http.HandlerFunc) http.HandlerFunc {
 			api.Claims = claims
 			next(w, r)
 		} else {
-			api.Error(w, http.StatusUnauthorized, fmt.Sprintf("Unauthorized Access Atempt, uid: %v", claims["uid"]))
+			api.Error(w, http.StatusUnauthorized, "invalid token claims", "Unauthorized")
 		}
 		return
 	}
@@ -145,35 +145,30 @@ func (api *API) AuthGrpcUnary(ctx context.Context, req interface{}, srv *grpc.Un
 	// retrieve token from gRPC meta
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		api.Log.Warn("JWT auth missing metadata")
-		return nil, status.Errorf(codes.Unauthenticated, "")
+		return nil, api.Errpc(codes.Unauthenticated, "JWT auth missing metadata", "Unauthorized")
 	}
 	ts, exist := md["authorization"]
 	if !exist {
 		ts, exist = md["Authorization"]
 		if !exist {
-			api.Log.Warn("JWT auth missing authorization field in metadata")
-			return nil, status.Errorf(codes.Unauthenticated, "")
+			return nil, api.Errpc(codes.Unauthenticated, "JWT auth missing authorization field in metadata", "Unauthorized")
 		}
 	}
 	token, err := jwt.Parse(strings.TrimPrefix(ts[0], "Bearer "), func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			api.Log.Warnf("Unexpected signing method: %v", token.Header["alg"])
-			return nil, status.Errorf(codes.Unauthenticated, "")
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
 		return api.TokenSec, nil
 	})
 	if err != nil {
-		api.Log.Warnf("JWT auth fail: %v", err)
-		return nil, status.Errorf(codes.Unauthenticated, "")
+		return nil, api.Errpc(codes.Unauthenticated, fmt.Sprintf("JWT auth fail: %v", err), "Unauthorized")
 	}
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		api.Token = AuthToken(ts[0])
 		api.Claims = claims
 		return handler(ctx, req)
 	}
-	api.Log.WithError(err).Warn("invalid token")
-	return nil, status.Errorf(codes.Unauthenticated, "")
+	return nil, api.Errpc(codes.Unauthenticated, fmt.Sprintf("invalid token claims: %v", err), "Unauthorized")
 }
 
 // ApiGet pass JWT from original request to target api
