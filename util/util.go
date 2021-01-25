@@ -723,15 +723,29 @@ func NewExeErr(f string, i ...string) ExeErr {
 	}
 	return ExeErr(r)
 }
-func (e ExeErr) String(s string, err interface{}) string {
-	if err == nil || err == "" {
-		return fmt.Sprintf("%v, %s", e, s)
+func (e ExeErr) String(err ...interface{}) string {
+	if len(err) == 0 {
+		return fmt.Sprintf("%v", e)
 	}
-	return fmt.Sprintf("%v, %s: %v", e, s, err)
+	if len(err) == 1 {
+		return fmt.Sprintf("%v, %v", e, err[0])
+	}
+	addErr := ""
+	for _, er := range err[1:] {
+		addErr += fmt.Sprintf(" %v", er)
+	}
+	return fmt.Sprintf("%v, %v:%s", e, err[0], addErr)
 }
-func (e ExeErr) Error(s string, err interface{}) error {
-	if err == nil || err == "" {
-		return fmt.Errorf("%v, %s", e, s)
+func (e ExeErr) Error(err ...interface{}) error {
+	if len(err) == 0 {
+		return fmt.Errorf("%v", e)
 	}
-	return fmt.Errorf("%v, %s: %v", e, s, err)
+	if len(err) == 0 {
+		return fmt.Errorf("%v, %v", e, err[0])
+	}
+	addErr := ""
+	for _, er := range err[1:] {
+		addErr += fmt.Sprintf(" %v", er)
+	}
+	return fmt.Errorf("%v, %v:%s", e, err[0], addErr)
 }
