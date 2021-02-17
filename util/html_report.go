@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html"
 	"reflect"
+	"strings"
 
 	"github.com/fatih/structs"
 	"github.com/sergi/go-diff/diffmatchpatch"
@@ -17,6 +18,10 @@ var (
 	MarkPending = " ------ " + `<span class="material-icons" style="position: relative; top: 0.3em; color: red; font-weight: bold;">sync</span>` + "\n"
 )
 
+type TblHeader struct {
+	Key    string
+	Header string
+}
 type TblHLColumn struct {
 	Mark   int
 	Header string
@@ -31,26 +36,49 @@ type TableWithHighlight struct {
 }
 type TableBuilder struct {
 	Data       []interface{}
-	Headers    []string
-	ColHLs     []string
+	Headers    []TblHeader
+	ColHLs     []string // header key of the highlight column
 	RowHLs     map[string]interface{}
 	FullBorder bool
+}
+
+func (d *TableBuilder) SetHeaders(h ...[]string) {
+	d.Headers = []TblHeader{}
+	if len(h) < 1 || len(h) > 2 {
+		return
+	}
+	for i, th := range h[0] {
+		head := TblHeader{th, strings.Title(th)} // default Header is title case of the key
+		if len(h) == 2 {
+			head.Header = h[1][i] // customized header
+		}
+		d.Headers = append(d.Headers, head)
+	}
 }
 
 func (d *TableBuilder) Build() string {
 	tb := TableWithHighlight{[]TblHLColumn{}, []TblHLRow{}}
 	for _, h := range d.Headers {
-		th := TblHLColumn{0, h}
-		if InStrings(h, d.ColHLs) {
+		th := TblHLColumn{0, h.Header}
+		if InStrings(h.Key, d.ColHLs) {
 			th.Mark = 10
 		}
 		tb.Column = append(tb.Column, th)
 	}
 	for _, v := range d.Data {
+		var vm map[string]interface{}
+		if structs.IsStruct(v) {
+			vm = structs.Map(v)
+		} else {
+			if vmr, ok := v.(map[string]interface{}); ok {
+				vm = vmr
+			} else {
+				continue
+			}
+		}
 		tr := TblHLRow{0, []interface{}{}}
-		vm := structs.Map(v)
 		for _, h := range d.Headers {
-			tr.Cells = append(tr.Cells, vm[h])
+			tr.Cells = append(tr.Cells, vm[h.Key])
 		}
 		f := true
 		for kh, vh := range d.RowHLs {
@@ -65,12 +93,10 @@ func (d *TableBuilder) Build() string {
 		}
 		tb.Row = append(tb.Row, tr)
 	}
-	fmt.Printf("%+v\n", tb)
 	if len(d.RowHLs) == 0 {
 		return tb.MakeHtmlTable(true, d.FullBorder)
 	}
 	return tb.MakeHtmlTable(false, d.FullBorder)
-	//return fmt.Sprintf("%+v", tb)
 }
 
 func (d *TableWithHighlight) MakeHtmlTable(AltRow, fullBorder bool) string {
