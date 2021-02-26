@@ -68,7 +68,20 @@ func (d *TableBuilder) Build() string {
 	for _, v := range d.Data {
 		var vm map[string]interface{}
 		if structs.IsStruct(v) {
-			vm = structs.Map(v)
+			//vm = structs.Map(v)
+			for _, field := range structs.Fields(v) {
+				if structs.IsStruct(field.Value()) {
+					if s, ok := field.Value().(interface{ String() string }); ok {
+						vm[field.Name()] = s.String()
+					} else if fd, ok := field.FieldOk("Name"); ok {
+						vm[field.Name()] = fd.Value()
+					} else {
+						vm[field.Name()] = structs.Map(field.Value())
+					}
+				} else {
+					vm[field.Name()] = field.Value()
+				}
+			}
 		} else {
 			if vmr, ok := v.(map[string]interface{}); ok {
 				vm = vmr
