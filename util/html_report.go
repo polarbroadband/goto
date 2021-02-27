@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
-	"reflect"
 	"strings"
 
 	"github.com/fatih/structs"
@@ -38,7 +37,7 @@ type TableBuilder struct {
 	Data       []interface{}
 	Headers    []TblHeader
 	ColHLs     []string // header key of the highlight column
-	RowHLs     map[string]interface{}
+	RowHLs     map[string][]interface{}
 	FullBorder bool
 }
 
@@ -95,7 +94,7 @@ func (d *TableBuilder) Build() string {
 		}
 		f := true
 		for kh, vh := range d.RowHLs {
-			if reflect.DeepEqual(vm[kh], vh) {
+			if InSlice(vm[kh], vh) {
 				f = f && true
 			} else {
 				f = f && false

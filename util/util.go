@@ -513,6 +513,17 @@ func SliceCompareOrderless(s1, s2 interface{}) bool {
 }
 */
 
+// InSlice check if a given value is in a slice
+// use reflect DeepEqual as comparison method
+func InSlice(v interface{}, s []interface{}) bool {
+	for _, m := range s {
+		if reflect.DeepEqual(v, m) {
+			return true
+		}
+	}
+	return false
+}
+
 /* ****************************************
 random string functions
 **************************************** */
