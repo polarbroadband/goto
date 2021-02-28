@@ -65,7 +65,7 @@ func (d *TableBuilder) Build() string {
 		tb.Column = append(tb.Column, th)
 	}
 	for _, v := range d.Data {
-		var vm map[string]interface{}
+		vm := make(map[string]interface{})
 		if structs.IsStruct(v) {
 			//vm = structs.Map(v)
 			for _, field := range structs.Fields(v) {
