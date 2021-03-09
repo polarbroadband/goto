@@ -1,6 +1,7 @@
 package util
 
 import (
+	"crypto/md5"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -718,6 +719,19 @@ func GetEnvArrayFrFile(fileName string) []map[string]string {
 		}
 	}
 	return res
+}
+
+// FileExist check if the File exist and produced the same MD5 checksum
+func FileExist(path, chksum string) (error, bool, string) {
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err, false, ""
+	}
+	fileSum := fmt.Sprintf("%x", md5.Sum(content))
+	if chksum != "" || fileSum != chksum {
+		return fmt.Errorf("file exist but failed MD5 check"), true, ""
+	}
+	return nil, true, fileSum
 }
 
 /* ****************************************
