@@ -728,7 +728,7 @@ func FileExist(path, chksum string) (error, bool, string) {
 		return err, false, ""
 	}
 	fileSum := fmt.Sprintf("%x", md5.Sum(content))
-	if chksum != "" || fileSum != chksum {
+	if chksum != "" && fileSum != chksum {
 		return fmt.Errorf("file exist but failed MD5 check"), true, ""
 	}
 	return nil, true, fileSum
