@@ -266,8 +266,18 @@ func (b *Block) RmPeriod() {
 }
 
 // DiffFormat format the Block to a Diff optimized string
+// remove extra empty line, extra white space on the right
+// replace string matched by given regex
 func (b *Block) DiffFormat(p map[string]string) (s string) {
+	repl := func(s string) string {
+		r := ""
+		for i := 0; i < len(s); i++ {
+			r += "-"
+		}
+		return r
+	}
 	lastEmpty := false
+NEXTLINE:
 	for _, l := range *b {
 		// trim
 		nl := strings.TrimRight(l, " \n\t\r")
@@ -280,14 +290,22 @@ func (b *Block) DiffFormat(p map[string]string) (s string) {
 		} else {
 			lastEmpty = false
 			// remove line
-			if p["rmTSLine"] != "" {
-				if regexp.MustCompile(p["rmTSLine"]).MatchString(nl) {
-					continue
+			if patterns := p["rmTSLine"]; patterns != "" {
+				for _, pattern := range strings.Split(patterns, "\n") {
+					if regexp.MustCompile(pattern).MatchString(nl) {
+						continue NEXTLINE
+					}
 				}
 			}
 			// substitute string
-			if p["subDurStr"] != "" {
-				nl = regexp.MustCompile(p["subDurStr"]).ReplaceAllString(nl, "####")
+			if patterns := p["subDurStr"]; patterns != "" {
+				for _, pattern := range strings.Split(patterns, "\n") {
+					if fd := regexp.MustCompile(pattern).FindStringSubmatch(nl); len(fd) > 0 {
+						for _, pn := range fd[1:] {
+							nl = regexp.MustCompile(pn).ReplaceAllStringFunc(nl, repl)
+						}
+					}
+				}
 			}
 		}
 		// assembly string
