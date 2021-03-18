@@ -267,14 +267,25 @@ func (b *Block) RmPeriod() {
 
 // DiffFormat format the Block to a Diff optimized string
 // remove extra empty line, extra white space on the right
-// replace string matched by given regex
-func (b *Block) DiffFormat(p map[string]string) (s string) {
+// remove line if match the pattern with prefix "_REMOVE_"
+// replace submatch string with same number of "-"
+func (b *Block) DiffFormat(p string) (s string) {
 	repl := func(s string) string {
 		r := ""
 		for i := 0; i < len(s); i++ {
 			r += "-"
 		}
 		return r
+	}
+	rmPatterns := []string{}
+	ssPatterns := []string{}
+	for _, pt := range strings.Split(p, "\n") {
+		re := regexp.MustCompile(`^_REMOVE_`)
+		if re.MatchString(pt) {
+			rmPatterns = append(rmPatterns, re.ReplaceAllString(pt, ""))
+		} else {
+			ssPatterns = append(ssPatterns, pt)
+		}
 	}
 	lastEmpty := false
 NEXTLINE:
@@ -290,20 +301,16 @@ NEXTLINE:
 		} else {
 			lastEmpty = false
 			// remove line
-			if patterns := p["rmTSLine"]; patterns != "" {
-				for _, pattern := range strings.Split(patterns, "\n") {
-					if regexp.MustCompile(pattern).MatchString(nl) {
-						continue NEXTLINE
-					}
+			for _, pattern := range rmPatterns {
+				if regexp.MustCompile(pattern).MatchString(nl) {
+					continue NEXTLINE
 				}
 			}
 			// substitute string
-			if patterns := p["subDurStr"]; patterns != "" {
-				for _, pattern := range strings.Split(patterns, "\n") {
-					if fd := regexp.MustCompile(pattern).FindStringSubmatch(nl); len(fd) > 0 {
-						for _, pn := range fd[1:] {
-							nl = regexp.MustCompile(pn).ReplaceAllStringFunc(nl, repl)
-						}
+			for _, pattern := range ssPatterns {
+				if fd := regexp.MustCompile(pattern).FindStringSubmatch(nl); len(fd) > 0 {
+					for _, pn := range fd[1:] {
+						nl = regexp.MustCompile(pn).ReplaceAllStringFunc(nl, repl)
 					}
 				}
 			}
