@@ -24,14 +24,34 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// AuthKey is a speical type used for keys in context values, to avoid accident override
+type AuthKey string
+
+var (
+	TOKEN  = AuthKey("token")
+	CLAIMS = AuthKey("claims")
+)
+
+// AuthToken is a PerRPCCredentials interface,
+// as the augument of grpc.WithPerRPCCredentials()
+type AuthToken string
+
+// GetRequestMetadata is a required PerRPCCredentials interface method
+// to inject token to request metadata
+func (t AuthToken) GetRequestMetadata(ctx context.Context, in ...string) (map[string]string, error) {
+	return map[string]string{"authorization": string(t)}, nil
+}
+
+// RequireTransportSecurity is a required PerRPCCredentials interface method
+// to mandate use of TLS transport layer
+func (t AuthToken) RequireTransportSecurity() bool {
+	return true
+}
+
 // API supply REST/gRPC api common utilities
 type API struct {
 	// JWT token secret
 	TokenSec []byte
-	// AuthToken type JWT token string
-	Token AuthToken
-	// authenticated JWT claims map
-	Claims jwt.MapClaims
 	// gRPC api list not requir auth check
 	NoAuth []string
 	Log    *log.Entry
@@ -46,15 +66,38 @@ func (api *API) Error(w http.ResponseWriter, code int, err ...string) {
 		err = append(err, "server error")
 	}
 	api.Log.Error(err[0])
-	res := make(map[string]string)
+	msg := make(map[string]string)
 	if len(err) == 1 {
-		res["error"] = err[0]
+		msg["error"] = err[0]
 	} else {
-		res["error"] = strings.Join(err[1:], ", ")
+		msg["error"] = strings.Join(err[1:], ", ")
 	}
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(res)
+	json.NewEncoder(w).Encode(msg)
+}
+
+// Errws is websocket api error handling function
+// log 1st error message if exist
+// report joint 2nd up to the end error messages if exist, otherwise report the same 1st message
+// response http error code with json body using key "error"
+func (api *API) Errws(socket *websocket.Conn, err ...string) {
+	if len(err) == 0 {
+		err = append(err, "server error")
+	}
+	api.Log.Error(err[0])
+	msg := make(map[string]string)
+	if len(err) == 1 {
+		msg["error"] = err[0]
+	} else {
+		msg["error"] = strings.Join(err[1:], ", ")
+	}
+	if jsd, err := json.Marshal(msg); err != nil {
+		api.Log.WithError(err).Error("fail to jsonfy error message")
+	} else if err := socket.WriteMessage(1, jsd); err != nil {
+		api.Log.WithError(err).Error("fail to report error message over websocket")
+	}
+	return
 }
 
 // Errpc is gRPC api error handling function
@@ -66,13 +109,28 @@ func (api *API) Errpc(code codes.Code, err ...string) error {
 		err = append(err, "server error")
 	}
 	api.Log.Error(err[0])
-	var res string
+	var msg string
 	if len(err) == 1 {
-		res = err[0]
+		msg = err[0]
 	} else {
-		res = strings.Join(err[1:], ", ")
+		msg = strings.Join(err[1:], ", ")
 	}
-	return status.Errorf(code, res)
+	return status.Errorf(code, msg)
+}
+
+// GetJWT return "token" and "claims" value from context values
+func (api *API) GetJWT(ctx context.Context) (AuthToken, jwt.MapClaims) {
+	return ctx.Value(TOKEN).(AuthToken), ctx.Value(CLAIMS).(jwt.MapClaims)
+}
+
+// GetToken return "token" value from context values
+func (api *API) GetToken(ctx context.Context) AuthToken {
+	return ctx.Value(TOKEN).(AuthToken)
+}
+
+// GetClaims return "claims" value from context values
+func (api *API) GetClaims(ctx context.Context) jwt.MapClaims {
+	return ctx.Value(CLAIMS).(jwt.MapClaims)
 }
 
 // Auth http handler function
@@ -96,42 +154,15 @@ func (api *API) Auth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			api.Token = AuthToken(r.Header.Get("Authorization"))
-			api.Claims = claims
-			next(w, r)
+			ctx := context.WithValue(r.Context(), TOKEN, AuthToken(r.Header.Get("Authorization")))
+			ctx = context.WithValue(ctx, CLAIMS, claims)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		} else {
 			api.Error(w, http.StatusUnauthorized, "invalid token claims", "Unauthorized")
 		}
 		return
 	}
 }
-
-/*
-func auth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := strings.Split(r.Header.Get("Authorization"), "Bearer ")
-		if len(authHeader) != 2 {
-			log.Warn("Malformed token")
-			w.WriteHeader(http.StatusUnauthorized)
-		} else {
-			jwtToken := authHeader[1]
-			token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-				}
-				return TOKENSEC, nil
-			})
-
-			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-				ctx := context.WithValue(r.Context(), "token", claims)
-				next.ServeHTTP(w, r.WithContext(ctx))
-			} else {
-				log.WithError(err).Warnf("Unauthorized Access Atempt, uid: %v", claims["uid"])
-				w.WriteHeader(http.StatusUnauthorized)
-			}
-		}
-	})
-}*/
 
 // AuthGrpcUnary gRPC handler function, called by gRPC unary interceptor for api JWT authentication
 // perform Unary function JWT authentication and conserve token/claims to be used by the next handler
@@ -164,11 +195,23 @@ func (api *API) AuthGrpcUnary(ctx context.Context, req interface{}, srv *grpc.Un
 		return nil, api.Errpc(codes.Unauthenticated, fmt.Sprintf("JWT auth fail: %v", err), "Unauthorized")
 	}
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		api.Token = AuthToken(ts[0])
-		api.Claims = claims
+		ctx = context.WithValue(ctx, TOKEN, AuthToken(ts[0]))
+		ctx = context.WithValue(ctx, CLAIMS, claims)
 		return handler(ctx, req)
 	}
 	return nil, api.Errpc(codes.Unauthenticated, fmt.Sprintf("invalid token claims: %v", err), "Unauthorized")
+}
+
+// WrappedServerStream is a grpc.ServerStream wrapper to expose context
+type WrappedServerStream struct {
+	grpc.ServerStream
+	// WrappedContext is the wrapper's own Context to carry data
+	WrappedContext context.Context
+}
+
+// Context returns the wrapper's WrappedContext, overwriting the nested grpc.ServerStream.Context()
+func (w *WrappedServerStream) Context() context.Context {
+	return w.WrappedContext
 }
 
 // AuthGrpcUnary gRPC handler function, called by gRPC stream interceptor for api JWT authentication
@@ -202,11 +245,30 @@ func (api *API) AuthGrpcStream(req interface{}, ss grpc.ServerStream, srv *grpc.
 		return api.Errpc(codes.Unauthenticated, fmt.Sprintf("JWT auth fail: %v", err), "Unauthorized")
 	}
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		api.Token = AuthToken(ts[0])
-		api.Claims = claims
-		return handler(req, ss)
+		ctx := context.WithValue(ss.Context(), TOKEN, AuthToken(ts[0]))
+		ctx = context.WithValue(ctx, CLAIMS, claims)
+		return handler(req, &WrappedServerStream{ss, ctx})
 	}
 	return api.Errpc(codes.Unauthenticated, fmt.Sprintf("invalid token claims: %v", err), "Unauthorized")
+}
+
+// SessionMeta keeps authenticated JWT properties for  the following websocket session
+type SessionMeta struct {
+	Token   AuthToken
+	Claims  jwt.MapClaims
+	Created time.Time
+}
+
+// PreAuth authorize and extract JWT properties for the following websocket sessions
+func (api *API) PreAuth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	if err := json.NewEncoder(w).Encode(SessionMeta{
+		Token:   api.GetToken(r.Context()),
+		Claims:  api.GetClaims(r.Context()),
+		Created: time.Now().UTC(),
+	}); err != nil {
+		api.Error(w, 500, "PreAuth, erroneous api response", err.Error())
+	}
 }
 
 // ApiGet pass JWT from original request to target api
@@ -233,22 +295,6 @@ var Upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin:     func(r *http.Request) bool { return true },
-}
-
-// AuthToken is a PerRPCCredentials interface,
-// as the augument of grpc.WithPerRPCCredentials()
-type AuthToken string
-
-// GetRequestMetadata is a required PerRPCCredentials interface method
-// to inject token to request metadata
-func (t AuthToken) GetRequestMetadata(ctx context.Context, in ...string) (map[string]string, error) {
-	return map[string]string{"authorization": string(t)}, nil
-}
-
-// RequireTransportSecurity is a required PerRPCCredentials interface method
-// to mandate use of TLS transport layer
-func (t AuthToken) RequireTransportSecurity() bool {
-	return true
 }
 
 // MongoOpr define methods for mongo database operation
