@@ -525,6 +525,17 @@ func InSlice(v interface{}, s []interface{}) bool {
 	return false
 }
 
+// GetValueIgnoreCase get value of key regardless case
+// return nil if not found
+func GetValueIgnoreCase(m map[string]interface{}, key string) interface{} {
+	for k, v := range m {
+		if strings.ToLower(k) == strings.ToLower(key) {
+			return v
+		}
+	}
+	return nil
+}
+
 /* ****************************************
 random string functions
 **************************************** */

@@ -18,8 +18,8 @@ var (
 )
 
 type TblHeader struct {
-	Key    string
-	Header string
+	Key   string
+	Label string // header label to display
 }
 type TblHLColumn struct {
 	Mark   int
@@ -36,29 +36,35 @@ type TableWithHighlight struct {
 type TableBuilder struct {
 	Data       []interface{}
 	Headers    []TblHeader
-	ColHLs     []string // header key of the highlight column
+	ColHLs     []string // header key of the highlight column or row key for vertical table
 	RowHLs     map[string][]interface{}
 	FullBorder bool
 }
 
+// SetHeaders is a helper function to initialize TblHeader structure
+// 1st argument list will be used as the keys, the corresponding labels are title case of these keys
+// 2nd argument list will be the customized labels if required, which will be mapped to the keys
 func (d *TableBuilder) SetHeaders(h ...[]string) {
 	d.Headers = []TblHeader{}
 	if len(h) < 1 || len(h) > 2 {
 		return
 	}
 	for i, th := range h[0] {
-		head := TblHeader{th, strings.Title(th)} // default Header is title case of the key
+		head := TblHeader{th, strings.Title(th)} // default label is title case of the key
 		if len(h) == 2 {
-			head.Header = h[1][i] // customized header
+			head.Label = h[1][i] // customized label mapped to keys
 		}
 		d.Headers = append(d.Headers, head)
 	}
 }
 
+// BuildUnary generate html table, each row holds a data structure
+// table columne are sorted by Headers sequence
+// keys are not case sensitive
 func (d *TableBuilder) Build() string {
 	tb := TableWithHighlight{[]TblHLColumn{}, []TblHLRow{}}
 	for _, h := range d.Headers {
-		th := TblHLColumn{0, h.Header}
+		th := TblHLColumn{0, h.Label}
 		if InStrings(h.Key, d.ColHLs) {
 			th.Mark = 10
 		}
@@ -90,7 +96,7 @@ func (d *TableBuilder) Build() string {
 		}
 		tr := TblHLRow{0, []interface{}{}}
 		for _, h := range d.Headers {
-			tr.Cells = append(tr.Cells, vm[h.Key])
+			tr.Cells = append(tr.Cells, GetValueIgnoreCase(vm, h.Key))
 		}
 		f := true
 		for kh, vh := range d.RowHLs {
@@ -105,6 +111,62 @@ func (d *TableBuilder) Build() string {
 		}
 		tb.Row = append(tb.Row, tr)
 	}
+	if len(d.RowHLs) == 0 {
+		return tb.MakeHtmlTable(true, d.FullBorder)
+	}
+	return tb.MakeHtmlTable(false, d.FullBorder)
+}
+
+// BuildUnary generate html for display a single data struct in ordered vertical key/value pair table
+// Data must have at least one struct, and only the first one will be displayed
+// keys are not case sensitive
+func (d *TableBuilder) BuildUnary() string {
+	tb := TableWithHighlight{[]TblHLColumn{}, []TblHLRow{}}
+
+	vm := make(map[string]interface{})
+	if structs.IsStruct(d.Data[0]) {
+		for _, field := range structs.Fields(d.Data[0]) {
+			if structs.IsStruct(field.Value()) {
+				if s, ok := field.Value().(interface{ String() string }); ok {
+					vm[field.Name()] = s.String()
+				} else if fd, ok := field.FieldOk("Name"); ok {
+					vm[field.Name()] = fd.Value()
+				} else {
+					vm[field.Name()] = structs.Map(field.Value())
+				}
+			} else {
+				vm[field.Name()] = field.Value()
+			}
+		}
+	} else {
+		if vmr, ok := d.Data[0].(map[string]interface{}); ok {
+			vm = vmr
+		} else {
+			return "invalid data"
+		}
+	}
+
+	// pick and order the required fields
+	for _, h := range d.Headers {
+		tr := TblHLRow{0, []interface{}{h.Label, GetValueIgnoreCase(vm, h.Key)}}
+		for _, hl := range d.ColHLs {
+			if strings.ToLower(hl) == strings.ToLower(h.Key) {
+				tr.Mark = 10
+			}
+		}
+		tb.Row = append(tb.Row, tr)
+	}
+	// attach the rest of fields of the data struct
+PROVIDEDATA:
+	for k, v := range vm {
+		for _, h := range d.Headers {
+			if strings.ToLower(k) == strings.ToLower(h.Key) {
+				continue PROVIDEDATA
+			}
+		}
+		tb.Row = append(tb.Row, TblHLRow{0, []interface{}{strings.Title(k), v}})
+	}
+
 	if len(d.RowHLs) == 0 {
 		return tb.MakeHtmlTable(true, d.FullBorder)
 	}
