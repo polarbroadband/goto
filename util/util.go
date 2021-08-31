@@ -29,6 +29,15 @@ func init() {
 map manipulating
 **************************************** */
 
+// TrimMap removes leading and tailing white spaces from all members
+func TrimMap(m map[string]string) map[string]string {
+	n := make(map[string]string)
+	for k, v := range m {
+		n[k] = strings.TrimSpace(v)
+	}
+	return n
+}
+
 // KeySlice returns a slice of map keys
 func KeySlice(m interface{}) []string {
 	xm, ok := m.(map[string]interface{})
@@ -87,6 +96,64 @@ func AssertMapString(x interface{}, k string) string {
 		return ""
 	}
 	return str
+}
+
+// DigValue walk through the embedded map[string]interface{} base on a sequence of keys
+// retrieve the value of last key, return nil and broken branch
+func DigValue(m interface{}, keys ...string) (interface{}, string) {
+	get := func(m interface{}, key string) interface{} {
+		if mm, ok := m.(map[string]interface{}); ok {
+			return mm[key]
+		}
+		return nil
+	}
+
+	if _, ok := m.(map[string]interface{}); !ok {
+		return nil, "/"
+	}
+
+	broken := ""
+	v := m
+	for _, key := range keys {
+		v = get(v, key)
+		if v == nil {
+			broken += "/" + key
+			break
+		}
+	}
+	return v, broken
+}
+
+// DigValue walk through the embedded map[string]interface{} base on a sequence of keys
+// retrieve the string value of last key, return nil and broken branch
+func DigString(m interface{}, keys ...string) (string, string) {
+	r, broken := DigValue(m, keys...)
+	if r != nil {
+		if v, ok := r.(string); ok {
+			return v, ""
+		}
+		return "", fmt.Sprintf("invalid type %T, value %v", r, r)
+	}
+	return "", broken
+}
+
+// DigValue walk through the embedded map[string]interface{} base on a sequence of keys
+// retrieve the float64 value of last key
+// will attemp to convert string i.e "1.43" to float64 if possible
+// return nil and broken branch
+func DigFloat(m interface{}, keys ...string) (float64, string) {
+	r, broken := DigValue(m, keys...)
+	if r != nil {
+		if v, ok := r.(float64); ok {
+			return v, ""
+		} else if v, ok := r.(string); ok {
+			if sv, err := strconv.ParseFloat(v, 64); err == nil {
+				return sv, ""
+			}
+		}
+		return 0, fmt.Sprintf("invalid type %T, value %v", r, r)
+	}
+	return 0, broken
 }
 
 /* ****************************************
