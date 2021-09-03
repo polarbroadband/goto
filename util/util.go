@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -26,8 +27,136 @@ func init() {
 }
 
 /* ****************************************
+concurrent map operation
+**************************************** */
+
+type DynaStore struct {
+	Pool map[string]interface{}
+	lock *sync.RWMutex
+}
+
+func NewDynaStore(c ...map[string]interface{}) *DynaStore {
+	if len(c) < 1 {
+		return &DynaStore{map[string]interface{}{}, &sync.RWMutex{}}
+	}
+	pool := DynaStore{c[0], &sync.RWMutex{}}
+	for _, cc := range c[1:] {
+		pool.Update(cc)
+	}
+	return &pool
+}
+
+// Len retrieve the current size of pool
+func (s *DynaStore) Len() int {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return len(s.Pool)
+}
+
+// Exist return true if key exists in pool
+func (s *DynaStore) Exist(k string) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	_, exist := s.Pool[k]
+	return exist
+}
+
+// Keys return key list of the pool
+func (s *DynaStore) Keys() []string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	keys := []string{}
+	for k, _ := range s.Pool {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// Update add key/value pairs to the pool, overwrite if key duplicated
+func (s *DynaStore) Update(d map[string]interface{}) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	for k, v := range d {
+		s.Pool[k] = v
+	}
+}
+
+// Get retrieve value of given key as interface{}
+func (s *DynaStore) Get(k string) interface{} {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.Pool[k]
+}
+
+// Fetch retrieve value of given key as interface{}
+func (s *DynaStore) Fetch(k string) interface{} {
+	s.lock.RLock()
+	r := s.Pool[k]
+	s.lock.RUnlock()
+	s.lock.Lock()
+	delete(s.Pool, k)
+	s.lock.Unlock()
+	return r
+}
+
+// GetString retrieve string value, return "" if invalid
+func (s *DynaStore) GetString(k string) string {
+	if res, ok := s.Get(k).(string); ok {
+		return res
+	}
+	return ""
+}
+
+// GetBool retrieve bool value, return false if invalid
+func (s *DynaStore) GetBool(k string) bool {
+	if s, ok := s.Get(k).(bool); ok {
+		return s
+	}
+	return false
+}
+
+// GetStringArr retrieve a string slice, return empty if invalid
+func (s *DynaStore) GetStringArr(k string) []string {
+	return TrmEmptyString(s.Get(k))
+}
+
+// GetMap retrieve embedded map, return nil if invalid
+func (s *DynaStore) GetMap(k string) map[string]interface{} {
+	if res, ok := s.Get(k).(map[string]interface{}); ok {
+		return res
+	}
+	return nil
+}
+
+// GetInt64 retrieve number value as int64, return 0 if invalid
+// convert int, float64 to int64
+// convert string i.e "98" or "9.12" to int64
+func (s *DynaStore) GetInt64(k string) int64 {
+	if m, err := strconv.ParseFloat(fmt.Sprintf("%v", s.Get(k)), 64); err == nil {
+		return int64(math.Round(m))
+	}
+	return 0
+}
+
+// GetFloat retrieve number value as float64, return 0 if invalid
+func (s *DynaStore) GetFloat(k string) float64 {
+	if m, err := strconv.ParseFloat(fmt.Sprintf("%v", s.Get(k)), 64); err == nil {
+		return m
+	}
+	return 0
+}
+
+/* ****************************************
 map manipulating
 **************************************** */
+
+// MapMerge merge two map[string]interface{}
+func MapMerge(a, b map[string]interface{}) map[string]interface{} {
+	for k, v := range b {
+		a[k] = v
+	}
+	return a
+}
 
 // TrimMap removes leading and tailing white spaces from all members
 func TrimMap(m map[string]string) map[string]string {

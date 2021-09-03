@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -303,11 +304,26 @@ type MongoOpr struct {
 	Mcoll   *mongo.Collection
 	Mctx    context.Context
 	Mcancel context.CancelFunc
+	Locker  *sync.RWMutex
 }
 
 func (dba *MongoOpr) Set(col string) {
+	dba.Locker.Lock()
 	dba.Mctx, dba.Mcancel = context.WithTimeout(context.Background(), 10*time.Second)
 	dba.Mcoll = dba.Mdb.Collection(col)
+	dba.Locker.Unlock()
+}
+
+func (dba *MongoOpr) GetMcoll() *mongo.Collection {
+	dba.Locker.RLock()
+	defer dba.Locker.RUnlock()
+	return dba.Mcoll
+}
+
+func (dba *MongoOpr) GetMctx() context.Context {
+	dba.Locker.RLock()
+	defer dba.Locker.RUnlock()
+	return dba.Mctx
 }
 
 // GetID find the exact data based on the given mongo _id and projection
@@ -318,7 +334,7 @@ func (dba *MongoOpr) GetID(res interface{}, id primitive.ObjectID, projection ma
 	if err != nil {
 		return false, err
 	}
-	if err := dba.Mcoll.FindOne(dba.Mctx, f, options.FindOne().SetProjection(p)).Decode(res); err != nil {
+	if err := dba.GetMcoll().FindOne(dba.GetMctx(), f, options.FindOne().SetProjection(p)).Decode(res); err != nil {
 		if err == mongo.ErrNoDocuments {
 			return false, nil
 		} else {
@@ -339,7 +355,7 @@ func (dba *MongoOpr) GetData(res interface{}, filter, projection map[string]inte
 	if err != nil {
 		return false, err
 	}
-	if err := dba.Mcoll.FindOne(dba.Mctx, f, options.FindOne().SetProjection(p)).Decode(res); err != nil {
+	if err := dba.GetMcoll().FindOne(dba.GetMctx(), f, options.FindOne().SetProjection(p)).Decode(res); err != nil {
 		if err == mongo.ErrNoDocuments {
 			return false, nil
 		} else {
@@ -364,11 +380,11 @@ func (dba *MongoOpr) GetDataset(res interface{}, filter, projection, order map[s
 		return err
 	}
 	// find all but only return projected fields
-	cursor, err := dba.Mcoll.Find(dba.Mctx, f, options.Find().SetSort(o).SetProjection(p))
+	cursor, err := dba.GetMcoll().Find(dba.GetMctx(), f, options.Find().SetSort(o).SetProjection(p))
 	if err != nil {
 		return err
 	}
-	if err := cursor.All(dba.Mctx, res); err != nil {
+	if err := cursor.All(dba.GetMctx(), res); err != nil {
 		return err
 	}
 	return nil
