@@ -16,6 +16,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/kr/pretty"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -102,7 +104,7 @@ func (s *DynaStore) Fetch(k string) interface{} {
 // GetString retrieve string value, return "" if invalid
 func (s *DynaStore) GetString(k string) string {
 	if res, ok := s.Get(k).(string); ok {
-		return res
+		return strings.TrimSpace(res)
 	}
 	return ""
 }
@@ -941,6 +943,11 @@ func FileExist(path, chksum string) (error, bool, string) {
 	return nil, true, fileSum
 }
 
+// Debug pretty prints the any go object
+func Debug(note string, s interface{}) {
+	pretty.Printf("\n\n--- %s ---\n%# v\n", note, s)
+}
+
 /* ****************************************
 Error handling
 **************************************** */
@@ -972,7 +979,7 @@ func (e ExeErr) Error(err ...interface{}) error {
 	if len(err) == 0 {
 		return fmt.Errorf("%v", e)
 	}
-	if len(err) == 0 {
+	if len(err) == 1 {
 		return fmt.Errorf("%v, %v", e, err[0])
 	}
 	addErr := ""
